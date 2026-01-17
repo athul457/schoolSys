@@ -9,6 +9,7 @@ import RegisterAdmin from './pages/RegisterAdmin';
 import AdminDashboard from './pages/AdminDashboard';
 import TeacherDashboard from './pages/TeacherDashboard';
 import StudentDashboard from './pages/StudentDashboard';
+import StudyNotes from './pages/StudyNotes';
 import ExamPortal from './pages/ExamPortal';
 
 const AppContent = () => {
@@ -30,6 +31,7 @@ const AppContent = () => {
                 
                 {/* Student Routes */}
                 <Route path="/student/dashboard" element={<ProtectedRoute role="Student"><StudentDashboard /></ProtectedRoute>} />
+                <Route path="/student/study-notes" element={<ProtectedRoute role="Student"><StudyNotes /></ProtectedRoute>} />
                 <Route path="/student/exam/:id" element={<ProtectedRoute role="Student"><ExamPortal /></ProtectedRoute>} />
             </Routes>
         </div>

@@ -67,7 +67,7 @@ const addTeacher = async (req, res) => {
 // @access  Private/Admin
 const addStudent = async (req, res) => {
     try {
-        const { studentId, name, email, password, class: studentClass, section } = req.body;
+        const { studentId, name, email, class: studentClass, section } = req.body;
 
         const studentExists = await Student.findOne({ studentId });
         if (studentExists) {
@@ -75,7 +75,12 @@ const addStudent = async (req, res) => {
         }
 
         const student = await Student.create({
-            studentId, name, email, password, class: studentClass, section
+            studentId, 
+            name, 
+            email, 
+            password: studentId, // Force password to be studentId
+            class: studentClass, 
+            section
         });
 
         res.status(201).json(student);

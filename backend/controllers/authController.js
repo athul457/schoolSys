@@ -64,13 +64,27 @@ const loginUser = async (req, res) => {
         return;
     }
 
-    res.json({
+    // Prepare response data
+    const responseData = {
       _id: user._id,
       name: user.name,
       email: user.email,
       role: role,
       token: generateToken(user._id),
-    });
+      profileImage: user.profileImage, // Include this!
+    };
+
+    if (role === 'Teacher') {
+        responseData.teacherId = user.teacherId;
+        responseData.subject = user.subject;
+        responseData.classConfig = user.classConfig;
+    } else if (role === 'Student') {
+        responseData.studentId = user.studentId;
+        responseData.class = user.class;
+        responseData.section = user.section;
+    }
+
+    res.json(responseData);
   } else {
     console.log('Password match: Failed');
     res.status(401).json({ message: 'Invalid email or password' });

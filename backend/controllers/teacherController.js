@@ -1,6 +1,7 @@
 const Exam = require('../models/Exam');
 const Student = require('../models/Student');
 const Result = require('../models/Result');
+const Teacher = require('../models/Teacher');
 
 // @desc    Get Teacher's Exams
 // @route   GET /api/teacher/exams

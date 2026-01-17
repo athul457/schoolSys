@@ -3,43 +3,78 @@ import axios from 'axios';
 import { toast } from 'react-hot-toast';
 import { useAuth } from '../context/AuthContext';
 import { motion, AnimatePresence } from 'framer-motion';
-import { FaClipboardList, FaPlus, FaUsers, FaUserSlash, FaUserCheck, FaUserPlus, FaUpload, FaTrash, FaTimes } from 'react-icons/fa';
+import { FaClipboardList, FaPlus, FaUsers, FaUserSlash, FaUserCheck, FaUserPlus, FaTrash, FaPen, FaEye, FaSearch, FaTimes } from 'react-icons/fa';
 import DashboardNavbar from '../components/DashboardNavbar';
+
+const StatsCard = ({ title, count, icon: Icon, color }) => (
+    <motion.div 
+       initial={{ opacity: 0, y: 20 }}
+       animate={{ opacity: 1, y: 0 }}
+       className="bg-white/70 backdrop-blur-xl p-6 rounded-3xl shadow-lg border border-white/50 flex items-center justify-between relative overflow-hidden group hover:shadow-2xl transition-all duration-300"
+   >
+       <div className={`absolute top-0 right-0 w-32 h-32 bg-${color}-500/10 rounded-full blur-3xl -mr-16 -mt-16 group-hover:bg-${color}-500/20 transition-all`}></div>
+       
+       <div>
+           <p className="text-gray-500 text-sm font-bold uppercase tracking-wider">{title}</p>
+           <h3 className="text-4xl font-black text-gray-800 mt-1">{count}</h3>
+       </div>
+       <div className={`p-4 bg-${color}-100 text-${color}-600 rounded-2xl shadow-inner group-hover:scale-110 transition-transform duration-300`}>
+            <Icon size={28} />
+       </div>
+   </motion.div>
+);
 
 const TeacherDashboard = () => {
     const { user } = useAuth();
     const [activeTab, setActiveTab] = useState('exams'); // exams, students, suspended
     const [exams, setExams] = useState([]);
     const [students, setStudents] = useState([]);
+    const [stats, setStats] = useState({ exams: 0, students: 0, suspended: 0 });
     const [loading, setLoading] = useState(false);
     
     // Modals
     const [examModalConfig, setExamModalConfig] = useState({ show: false, mode: 'add', data: null });
     const [showStudentModal, setShowStudentModal] = useState(false);
-    const [showResultModal, setShowResultModal] = useState(false);
     
     // Selected for actions
     const [selectedExam, setSelectedExam] = useState(null);
 
+    // Results Modal specific
+    const [showResultsModal, setShowResultsModal] = useState(false);
+    const [selectedExamResults, setSelectedExamResults] = useState(null);
+    const [loadingResults, setLoadingResults] = useState(false);
+
     const fetchData = async () => {
         setLoading(true);
         try {
+            // Fetch stats if possible or derive from separate calls
+            // For now, we will just fetch the data for the active tab to keep it efficient, 
+            // but to show stats we might need lighter endpoints or just cache locally.
+            // Let's fetch all quickly for the stats counters for a premium feel.
+            
+            const [examsRes, studentsRes, suspendedRes] = await Promise.all([
+                axios.get('/teacher/exams'),
+                axios.get('/teacher/students?suspended=false'),
+                axios.get('/teacher/students?suspended=true')
+            ]);
+
+            setStats({
+                exams: examsRes.data?.length || 0,
+                students: studentsRes.data?.length || 0,
+                suspended: suspendedRes.data?.length || 0
+            });
+
             if (activeTab === 'exams') {
-                const { data } = await axios.get('/teacher/exams');
-                setExams(data);
-                // Also fetch students for dropdown in results
-                const studentRes = await axios.get('/teacher/students?suspended=false');
-                setStudents(studentRes.data);
+                setExams(examsRes.data);
+                // setStudents(studentsRes.data); // Potentially needed for results dropdown
             } else if (activeTab === 'students') {
-                const { data } = await axios.get('/teacher/students?suspended=false');
-                setStudents(data);
+                setStudents(studentsRes.data);
             } else if (activeTab === 'suspended') {
-                 const { data } = await axios.get('/teacher/students?suspended=true');
-                 setStudents(data);
+                setStudents(suspendedRes.data);
             }
         } catch (error) {
             console.error(error);
-            toast.error('Failed to fetch data');
+            toast.error('Failed to sync data');
         }
         setLoading(false);
     };
@@ -47,11 +82,6 @@ const TeacherDashboard = () => {
     useEffect(() => {
         fetchData();
     }, [activeTab]);
-
-    // State for Results
-    const [showResultsModal, setShowResultsModal] = useState(false);
-    const [selectedExamResults, setSelectedExamResults] = useState(null);
-    const [loadingResults, setLoadingResults] = useState(false);
 
     const handleViewResults = async (examId, examName) => {
         setLoadingResults(true);
@@ -78,11 +108,6 @@ const TeacherDashboard = () => {
         }
     };
 
-    const handlePublishResults = (exam) => {
-        setSelectedExam(exam);
-        setShowResultModal(true);
-    };
-
     const handleDeleteExam = async (id) => {
         if (!confirm('Are you sure you want to delete this exam?')) return;
         try {
@@ -102,36 +127,96 @@ const TeacherDashboard = () => {
         setExamModalConfig({ show: true, mode: 'add', data: null });
     };
 
+    // Derived state for searching
+    const [searchTerm, setSearchTerm] = useState('');
+    const filteredContent = activeTab === 'exams' 
+        ? exams.filter(e => e.name.toLowerCase().includes(searchTerm.toLowerCase()))
+        : students.filter(s => s.name.toLowerCase().includes(searchTerm.toLowerCase()) || s.studentId.toLowerCase().includes(searchTerm.toLowerCase()));
+
     return (
-        <div className="min-h-screen bg-gray-50 pt-20 px-4 sm:px-6 lg:px-8">
+        <div className="min-h-screen bg-gradient-to-br from-amber-50 via-white to-orange-50 pt-24 px-4 sm:px-6 lg:px-8 relative overflow-hidden font-sans">
+             {/* Background Shapes */}
+             <div className="absolute top-0 left-0 w-full h-full overflow-hidden z-0 pointer-events-none">
+                <div className="absolute top-[-10%] right-[-10%] w-[40%] h-[40%] bg-amber-300 rounded-full mix-blend-multiply filter blur-[128px] opacity-20 animate-blob"></div>
+                <div className="absolute bottom-[-10%] left-[-10%] w-[40%] h-[40%] bg-orange-300 rounded-full mix-blend-multiply filter blur-[128px] opacity-20 animate-blob animation-delay-2000"></div>
+            </div>
+
             <DashboardNavbar />
-            <div className="max-w-7xl mx-auto pt-6">
-                <div className="flex justify-between items-center mb-8">
-                    <div>
-                        <h1 className="text-3xl font-bold text-gray-900">Teacher Dashboard</h1>
-                    </div>
+            
+            <div className="max-w-7xl mx-auto relative z-10">
+                <div className="mb-10">
+                    <h1 className="text-4xl font-extrabold text-gray-900 tracking-tight">Teacher Dashboard</h1>
+                    <p className="text-gray-500 mt-2 font-medium">Manage your exams and students effectively.</p>
                 </div>
 
-                {/* Tabs */}
-                <div className="flex space-x-4 mb-8 bg-white p-2 rounded-xl shadow-sm w-fit">
-                    <button 
-                        onClick={() => setActiveTab('exams')}
-                        className={`flex items-center space-x-2 px-6 py-2 rounded-lg font-medium transition-all ${activeTab === 'exams' ? 'bg-blue-600 text-white shadow-md' : 'text-gray-600 hover:bg-gray-100'}`}
-                    >
-                        <FaClipboardList /> <span>My Exams</span>
-                    </button>
-                    <button 
-                        onClick={() => setActiveTab('students')}
-                        className={`flex items-center space-x-2 px-6 py-2 rounded-lg font-medium transition-all ${activeTab === 'students' ? 'bg-blue-600 text-white shadow-md' : 'text-gray-600 hover:bg-gray-100'}`}
-                    >
-                        <FaUsers /> <span>Students</span>
-                    </button>
-                    <button 
-                        onClick={() => setActiveTab('suspended')}
-                        className={`flex items-center space-x-2 px-6 py-2 rounded-lg font-medium transition-all ${activeTab === 'suspended' ? 'bg-red-600 text-white shadow-md' : 'text-gray-600 hover:bg-gray-100'}`}
-                    >
-                        <FaUserSlash /> <span>Suspended Students</span>
-                    </button>
+                {/* Stats Grid */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
+                    <StatsCard title="My Exams" count={stats.exams} icon={FaClipboardList} color="amber" />
+                    <StatsCard title="Active Students" count={stats.students} icon={FaUsers} color="orange" />
+                    <StatsCard title="Suspended" count={stats.suspended} icon={FaUserSlash} color="red" />
+                </div>
+
+                {/* Tabs & Controls */}
+                <div className="flex flex-col md:flex-row justify-between items-end md:items-center mb-8 gap-4">
+                    <div className="flex bg-white/60 backdrop-blur-md p-1.5 rounded-2xl shadow-sm border border-white/50 overflow-x-auto max-w-full">
+                        <button 
+                            onClick={() => setActiveTab('exams')}
+                            className={`flex items-center space-x-2 px-6 py-2.5 rounded-xl font-bold transition-all whitespace-nowrap ${activeTab === 'exams' ? 'bg-gradient-to-r from-amber-500 to-orange-500 text-white shadow-lg' : 'text-gray-600 hover:bg-white/50 hover:text-amber-600'}`}
+                        >
+                            <FaClipboardList /> <span>Exams</span>
+                        </button>
+                        <button 
+                            onClick={() => setActiveTab('students')}
+                            className={`flex items-center space-x-2 px-6 py-2.5 rounded-xl font-bold transition-all whitespace-nowrap ${activeTab === 'students' ? 'bg-gradient-to-r from-amber-500 to-orange-500 text-white shadow-lg' : 'text-gray-600 hover:bg-white/50 hover:text-amber-600'}`}
+                        >
+                            <FaUsers /> <span>Students</span>
+                        </button>
+                        <button 
+                            onClick={() => setActiveTab('suspended')}
+                            className={`flex items-center space-x-2 px-6 py-2.5 rounded-xl font-bold transition-all whitespace-nowrap ${activeTab === 'suspended' ? 'bg-gradient-to-r from-red-500 to-red-600 text-white shadow-lg' : 'text-gray-600 hover:bg-white/50 hover:text-red-600'}`}
+                        >
+                            <FaUserSlash /> <span>Suspended</span>
+                        </button>
+                    </div>
+
+                     <div className="flex items-center gap-4 w-full md:w-auto">
+                        <div className="relative group w-full md:w-64 focus-within:w-72 transition-all duration-300">
+                            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                <FaSearch className="text-gray-400 group-focus-within:text-amber-500 transition-colors" />
+                            </div>
+                            <input 
+                                type="text" 
+                                placeholder="Search..." 
+                                className="block w-full pl-10 pr-10 py-3 bg-white/60 border border-white/50 rounded-xl leading-5 text-gray-900 placeholder-gray-400 focus:outline-none focus:bg-white focus:ring-2 focus:ring-amber-500/50 focus:border-amber-500 transition-all duration-300 shadow-sm hover:shadow-md"
+                                value={searchTerm}
+                                onChange={(e) => setSearchTerm(e.target.value)}
+                            />
+                            {searchTerm && (
+                                <button 
+                                    onClick={() => setSearchTerm('')}
+                                    className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600"
+                                >
+                                    <FaTimes />
+                                </button>
+                            )}
+                        </div>
+                        {activeTab === 'exams' && (
+                             <button 
+                                onClick={handleAddExam}
+                                className="flex items-center space-x-2 bg-gradient-to-r from-amber-500 to-orange-600 text-white px-5 py-3 rounded-xl shadow-lg hover:shadow-xl hover:scale-105 transition-all font-bold whitespace-nowrap"
+                            >
+                                <FaPlus /> <span>Create Exam</span>
+                            </button>
+                        )}
+                         {activeTab === 'students' && (
+                             <button 
+                                onClick={() => setShowStudentModal(true)}
+                                className="flex items-center space-x-2 bg-gradient-to-r from-green-500 to-emerald-600 text-white px-5 py-3 rounded-xl shadow-lg hover:shadow-xl hover:scale-105 transition-all font-bold whitespace-nowrap"
+                            >
+                                <FaUserPlus /> <span>Add Student</span>
+                            </button>
+                        )}
+                    </div>
                 </div>
 
                 <AnimatePresence mode='wait'>
@@ -143,92 +228,30 @@ const TeacherDashboard = () => {
                         transition={{ duration: 0.2 }}
                     >
                          {activeTab === 'exams' && (
-                             <div>
-                                 <div className="flex justify-between items-center mb-6">
-                                     <h2 className="text-xl font-bold text-gray-800">Use this section to manage exams</h2>
-                                     <button 
-                                         onClick={handleAddExam}
-                                         className="flex items-center space-x-2 bg-blue-600 text-white px-4 py-2 rounded-lg shadow hover:bg-blue-700 transition"
-                                     >
-                                         <FaPlus /> <span>Create Exam</span>
-                                     </button>
-                                 </div>
-                                 
-                                 {loading ? <p>Loading...</p> : (
-                                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                                         {exams.map(exam => (
-                                             <div key={exam._id} className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 relative">
-                                                 <h3 className="font-bold text-lg text-blue-900 pr-8">{exam.name}</h3>
-                                                 <p className="text-sm text-gray-600 mb-1"><span className="font-semibold">Subject:</span> {exam.subject}</p>
-                                                 <p className="text-sm text-gray-600 mb-1"><span className="font-semibold">Class:</span> {exam.class}</p>
-                                                 <p className="text-sm text-gray-600 mb-4"><span className="font-semibold">Date:</span> {new Date(exam.date).toLocaleDateString()}</p>
-                                                 
-                                                 <div className="flex space-x-2 mt-4">
-                                                     <button onClick={() => handleEditExam(exam)} className="flex-1 py-1.5 border border-blue-600 text-blue-600 rounded-lg text-sm font-medium hover:bg-blue-50">Edit</button>
-                                                     <button onClick={() => handleDeleteExam(exam._id)} className="flex-1 py-1.5 border border-red-600 text-red-600 rounded-lg text-sm font-medium hover:bg-red-50">Delete</button>
-                                                 </div>
-                                                 <button 
-                                                    onClick={() => handleViewResults(exam._id, exam.name)}
-                                                    className="w-full mt-2 py-1.5 bg-gray-100 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-200"
-                                                 >
-                                                     View Results
-                                                 </button>
-                                             </div>
-                                         ))}
-                                         {exams.length === 0 && <p className="text-gray-500 col-span-full text-center py-8">No exams created yet.</p>}
-                                     </div>
-                                 )}
+                             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+                                 {filteredContent.map(exam => (
+                                     <ExamCard 
+                                        key={exam._id} 
+                                        exam={exam} 
+                                        onEdit={() => handleEditExam(exam)} 
+                                        onDelete={() => handleDeleteExam(exam._id)}
+                                        onViewResults={() => handleViewResults(exam._id, exam.name)}
+                                    />
+                                 ))}
+                                 {filteredContent.length === 0 && <EmptyState message="No exams found." icon={FaClipboardList} />}
                              </div>
                          )}
 
                          {(activeTab === 'students' || activeTab === 'suspended') && (
-                             <div>
-                                 <div className="flex justify-between items-center mb-6">
-                                     <h2 className="text-xl font-bold text-gray-800">{activeTab === 'students' ? 'Active Students' : 'Suspended Students'}</h2>
-                                     {activeTab === 'students' && (
-                                         <button 
-                                             onClick={() => setShowStudentModal(true)}
-                                             className="flex items-center space-x-2 bg-green-600 text-white px-4 py-2 rounded-lg shadow hover:bg-green-700 transition"
-                                         >
-                                             <FaUserPlus /> <span>Add Student</span>
-                                         </button>
-                                     )}
-                                 </div>
-
-                                 <div className="bg-white rounded-xl shadow-sm overflow-hidden">
-                                    <table className="min-w-full divide-y divide-gray-200">
-                                        <thead className="bg-gray-50">
-                                            <tr>
-                                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
-                                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">ID</th>
-                                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Class</th>
-                                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody className="bg-white divide-y divide-gray-200">
-                                            {students.map(student => (
-                                                <tr key={student._id}>
-                                                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{student.name}</td>
-                                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{student.studentId}</td>
-                                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{student.class} {student.section}</td>
-                                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                                        <button 
-                                                            onClick={() => handleSuspendToggle(student._id, student.isSuspended)}
-                                                            className={`flex items-center space-x-1 px-3 py-1 rounded-md text-xs font-bold ${student.isSuspended ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}
-                                                        >
-                                                            {student.isSuspended ? <><FaUserCheck /> <span>Unsuspend</span></> : <><FaUserSlash /> <span>Suspend</span></>}
-                                                        </button>
-                                                    </td>
-                                                </tr>
-                                            ))}
-                                            {students.length === 0 && (
-                                                <tr>
-                                                    <td colSpan="4" className="px-6 py-8 text-center text-gray-500">No students found in this category.</td>
-                                                </tr>
-                                            )}
-                                        </tbody>
-                                    </table>
-                                 </div>
+                             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+                                 {filteredContent.map(student => (
+                                     <StudentCard 
+                                        key={student._id} 
+                                        student={student} 
+                                        onSuspendToggle={handleSuspendToggle} 
+                                    />
+                                 ))}
+                                 {filteredContent.length === 0 && <EmptyState message={`No ${activeTab} students found.`} icon={FaUsers} />}
                              </div>
                          )}
                     </motion.div>
@@ -244,78 +267,15 @@ const TeacherDashboard = () => {
                     />
                 )}
                 {showStudentModal && <AddStudentModal onClose={() => setShowStudentModal(false)} onRefresh={fetchData} />}
-                {showResultModal && <PublishResultModal exam={selectedExam} students={students} onClose={() => setShowResultModal(false)} />}
                 
                 {/* View Results Modal */}
                 <AnimatePresence>
                     {showResultsModal && (
-                        <motion.div
-                            initial={{ opacity: 0 }}
-                            animate={{ opacity: 1 }}
-                            exit={{ opacity: 0 }}
-                            className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4"
-                            onClick={() => setShowResultsModal(false)}
-                        >
-                            <motion.div
-                                initial={{ scale: 0.95 }}
-                                animate={{ scale: 1 }}
-                                exit={{ scale: 0.95 }}
-                                onClick={e => e.stopPropagation()}
-                                className="bg-white rounded-2xl shadow-xl w-full max-w-3xl overflow-hidden flex flex-col max-h-[80vh]"
-                            >
-                                <div className="p-6 border-b flex justify-between items-center bg-gray-50">
-                                    <h3 className="text-xl font-bold text-gray-900">
-                                        Results: <span className="text-blue-600">{selectedExamResults?.name}</span>
-                                    </h3>
-                                    <button onClick={() => setShowResultsModal(false)} className="text-gray-400 hover:text-gray-600 text-xl font-bold">
-                                        &times;
-                                    </button>
-                                </div>
-                                <div className="p-6 overflow-y-auto flex-1">
-                                    {loadingResults ? (
-                                        <div className="flex justify-center py-10"><p>Loading results...</p></div>
-                                    ) : selectedExamResults?.data?.length === 0 ? (
-                                        <div className="text-center py-10">
-                                            <p className="text-gray-500 text-lg">No students have submitted this exam yet.</p>
-                                        </div>
-                                    ) : (
-                                        <div className="overflow-x-auto">
-                                            <table className="w-full text-left border-collapse">
-                                                <thead className="bg-gray-100 text-gray-600 text-xs uppercase tracking-wider">
-                                                    <tr>
-                                                        <th className="px-6 py-3 rounded-tl-lg">Student</th>
-                                                        <th className="px-6 py-3">ID</th>
-                                                        <th className="px-6 py-3">Score</th>
-                                                        <th className="px-6 py-3 rounded-tr-lg">Status</th>
-                                                    </tr>
-                                                </thead>
-                                                <tbody className="divide-y divide-gray-100">
-                                                    {selectedExamResults?.data.map((res) => (
-                                                        <tr key={res._id} className="hover:bg-gray-50 transition-colors">
-                                                            <td className="px-6 py-4 font-medium text-gray-900">{res.student?.name}</td>
-                                                            <td className="px-6 py-4 text-gray-500 text-sm font-mono">{res.student?.studentId}</td>
-                                                            <td className="px-6 py-4 text-blue-600 font-bold text-lg">{res.marksObtained}</td>
-                                                            <td className="px-6 py-4">
-                                                                <span className={`px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wide ${
-                                                                    (res.marksObtained >= (res.exam?.passMarks || 0))
-                                                                    ? 'bg-green-100 text-green-700'
-                                                                    : 'bg-red-100 text-red-700'
-                                                                }`}>
-                                                                    {(res.marksObtained >= (res.exam?.passMarks || 0)) ? 'Passed' : 'Failed'}
-                                                                </span>
-                                                            </td>
-                                                        </tr>
-                                                    ))}
-                                                </tbody>
-                                            </table>
-                                        </div>
-                                    )}
-                                </div>
-                                <div className="p-4 border-t bg-gray-50 flex justify-end">
-                                    <button onClick={() => setShowResultsModal(false)} className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 font-medium">Close</button>
-                                </div>
-                            </motion.div>
-                        </motion.div>
+                        <ViewResultsModal 
+                            results={selectedExamResults} 
+                            loading={loadingResults} 
+                            onClose={() => setShowResultsModal(false)} 
+                        />
                     )}
                 </AnimatePresence>
             </div>
@@ -323,6 +283,98 @@ const TeacherDashboard = () => {
     );
 };
 
+const EmptyState = ({ message, icon: Icon }) => (
+    <div className="col-span-full py-16 text-center">
+        <div className="inline-block p-6 bg-white/50 backdrop-blur-sm rounded-full mb-4 border border-white/60 shadow-lg">
+            <Icon className="text-gray-300 text-5xl" />
+        </div>
+        <p className="text-gray-500 font-bold text-lg">{message}</p>
+    </div>
+);
+
+const ExamCard = ({ exam, onEdit, onDelete, onViewResults }) => (
+    <div className="group bg-white/70 backdrop-blur-xl rounded-3xl p-6 border border-white/60 shadow-lg hover:shadow-2xl hover:-translate-y-1 transition-all duration-300 relative overflow-hidden flex flex-col">
+        <div className="absolute top-0 right-0 w-24 h-24 bg-amber-500/10 rounded-bl-full -mr-4 -mt-4 transition-all group-hover:bg-amber-500/20"></div>
+        
+        <div className="mb-4">
+            <span className="px-3 py-1 bg-amber-100 text-amber-700 rounded-full text-xs font-extrabold uppercase tracking-wide">
+                {exam.subject}
+            </span>
+        </div>
+        
+        <h3 className="text-xl font-black text-gray-800 mb-2 leading-tight">{exam.name}</h3>
+        
+        <div className="space-y-2 mb-6 flex-1">
+             <div className="flex justify-between text-sm font-medium text-gray-500 border-b border-gray-100 pb-2">
+                <span>Class</span>
+                <span className="text-gray-800">{exam.class}</span>
+            </div>
+            <div className="flex justify-between text-sm font-medium text-gray-500 border-b border-gray-100 pb-2">
+                <span>Date</span>
+                <span className="text-gray-800">{new Date(exam.date).toLocaleDateString()}</span>
+            </div>
+            <div className="flex justify-between text-sm font-medium text-gray-500">
+                <span>Marks</span>
+                <span className="text-gray-800">{exam.fullMarks} (Pass: {exam.passMarks})</span>
+            </div>
+        </div>
+
+        <div className="grid grid-cols-2 gap-2">
+            <button onClick={onEdit} className="py-2 rounded-xl bg-blue-50 text-blue-600 font-bold text-xs hover:bg-blue-100 transition-colors flex items-center justify-center gap-1">
+               <FaPen /> Edit
+            </button>
+            <button onClick={onDelete} className="py-2 rounded-xl bg-red-50 text-red-600 font-bold text-xs hover:bg-red-100 transition-colors flex items-center justify-center gap-1">
+               <FaTrash /> Delete
+            </button>
+            <button onClick={onViewResults} className="col-span-2 py-3 rounded-xl bg-gray-800 text-white font-bold text-xs hover:bg-gray-900 transition-all flex items-center justify-center gap-2 shadow-lg hover:shadow-xl">
+               <FaEye /> View Results
+            </button>
+        </div>
+    </div>
+);
+
+const StudentCard = ({ student, onSuspendToggle }) => {
+    const initial = student.name?.charAt(0).toUpperCase();
+    const isSuspended = student.isSuspended;
+
+    return (
+        <div className="group relative bg-white/60 backdrop-blur-xl rounded-3xl p-6 border border-white/60 shadow-lg hover:shadow-2xl hover:-translate-y-1 transition-all duration-300">
+             <div className={`absolute inset-0 bg-gradient-to-br from-blue-500/5 to-indigo-500/5 opacity-0 group-hover:opacity-100 transition-opacity duration-300 rounded-3xl`}></div>
+             
+             <div className="relative z-10 flex flex-col h-full">
+                <div className="flex justify-between items-start mb-4">
+                    <div className="relative">
+                        <div className="w-14 h-14 rounded-2xl flex items-center justify-center text-2xl font-black text-white shadow-lg bg-gradient-to-br from-blue-400 to-indigo-600 transform group-hover:rotate-3 transition-transform">
+                            {initial}
+                        </div>
+                        <div className={`absolute -bottom-1 -right-1 w-4 h-4 rounded-full border-2 border-white ${isSuspended ? 'bg-red-500' : 'bg-green-500'}`}></div>
+                    </div>
+                     <span className={`px-2.5 py-1 rounded-lg text-[10px] font-extrabold uppercase tracking-wider h-fit ${isSuspended ? 'bg-red-100 text-red-600' : 'bg-green-100 text-green-600'}`}>
+                        {isSuspended ? 'Suspended' : 'Active'}
+                    </span>
+                </div>
+
+                <div className="mb-6 flex-1">
+                    <h3 className="text-xl font-extrabold text-gray-800 leading-tight mb-1 truncate">{student.name}</h3>
+                    <p className="text-sm font-medium text-gray-500 mb-3 truncate">{student.email}</p>
+                     <div className="flex items-center gap-2 text-xs font-semibold text-gray-500 bg-white/50 p-2 rounded-lg border border-white/50">
+                        <span className="text-blue-600 bg-blue-50 px-2 py-0.5 rounded">ID: {student.studentId}</span>
+                        <span className="text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded">Class: {student.class} {student.section}</span>
+                    </div>
+                </div>
+
+                <button 
+                    onClick={() => onSuspendToggle(student._id, isSuspended)}
+                    className={`w-full py-2.5 rounded-xl text-xs font-extrabold uppercase tracking-wide transition-colors border shadow-sm ${isSuspended ? 'bg-green-50 text-green-600 border-green-200 hover:bg-green-100' : 'bg-red-50 text-red-600 border-red-200 hover:bg-red-100'}`}
+                >
+                    {isSuspended ? 'Unsuspend Student' : 'Suspend Student'}
+                </button>
+             </div>
+        </div>
+    );
+};
+
+// ... Modals ...
 const CreateExamModal = ({ mode = 'add', initialData, onClose, onRefresh }) => {
     const [formData, setFormData] = useState(initialData || {
         name: '', subject: '', class: '', date: '', fullMarks: '', passMarks: '',
@@ -337,7 +389,6 @@ const CreateExamModal = ({ mode = 'add', initialData, onClose, onRefresh }) => {
 
     useEffect(() => {
         if (mode === 'edit' && initialData) {
-            // Ensure date is formatted for input
             const formattedDate = initialData.date ? new Date(initialData.date).toISOString().split('T')[0] : '';
             setFormData({ ...initialData, date: formattedDate });
         }
@@ -347,7 +398,6 @@ const CreateExamModal = ({ mode = 'add', initialData, onClose, onRefresh }) => {
         setFormData({ ...formData, [e.target.name]: e.target.value });
     };
 
-    // Question Handlers
     const handleQuestionChange = (e) => {
         setQuestion({ ...question, [e.target.name]: e.target.value });
     };
@@ -390,58 +440,64 @@ const CreateExamModal = ({ mode = 'add', initialData, onClose, onRefresh }) => {
         }
     };
 
+    // Styling helpers
+    const inputClass = "w-full px-5 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-amber-500 outline-none transition-all font-medium";
+
     return (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 overflow-y-auto">
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4 overflow-y-auto">
             <motion.div 
                 initial={{ scale: 0.9, opacity: 0 }}
                 animate={{ scale: 1, opacity: 1 }}
-                className="bg-white rounded-2xl p-8 w-full max-w-2xl shadow-2xl my-10"
+                className="bg-white/95 backdrop-blur-2xl rounded-3xl p-8 w-full max-w-3xl shadow-2xl border border-white/50 max-h-[90vh] overflow-y-auto"
             >
                 <div className="flex justify-between items-center mb-6">
-                    <h3 className="text-2xl font-bold">{mode === 'add' ? 'Create New' : 'Edit'} Exam</h3>
-                    <button onClick={onClose} className="text-gray-500 hover:text-gray-700">X</button>
+                    <div>
+                         <h3 className="text-2xl font-black text-gray-900 tracking-tight">{mode === 'add' ? 'Create New' : 'Edit'} Exam</h3>
+                         <p className="text-sm text-gray-500 font-medium">Set up exam details and questions.</p>
+                    </div>
+                    <button onClick={onClose} className="p-2 hover:bg-red-50 hover:text-red-500 rounded-full text-gray-400 transition-colors">✕</button>
                 </div>
                 
                 <form onSubmit={handleSubmit} className="space-y-6">
-                    <div className="grid grid-cols-2 gap-4">
-                        <input name="name" placeholder="Exam Name" required value={formData.name} onChange={handleChange} className="w-full px-4 py-2 border rounded-lg" />
-                        <input name="subject" placeholder="Subject" required value={formData.subject} onChange={handleChange} className="w-full px-4 py-2 border rounded-lg" />
-                        <input name="class" placeholder="Class" required value={formData.class} onChange={handleChange} className="w-full px-4 py-2 border rounded-lg" />
-                        <input name="date" type="date" required value={formData.date} onChange={handleChange} className="w-full px-4 py-2 border rounded-lg" />
-                        <input name="fullMarks" type="number" placeholder="Full Marks" required value={formData.fullMarks} onChange={handleChange} className="w-full px-4 py-2 border rounded-lg" />
-                        <input name="passMarks" type="number" placeholder="Pass Marks" required value={formData.passMarks} onChange={handleChange} className="w-full px-4 py-2 border rounded-lg" />
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <input name="name" placeholder="Exam Name" required value={formData.name} onChange={handleChange} className={inputClass} />
+                        <input name="subject" placeholder="Subject" required value={formData.subject} onChange={handleChange} className={inputClass} />
+                        <input name="class" placeholder="Class" required value={formData.class} onChange={handleChange} className={inputClass} />
+                        <input name="date" type="date" required value={formData.date} onChange={handleChange} className={inputClass} />
+                        <input name="fullMarks" type="number" placeholder="Full Marks" required value={formData.fullMarks} onChange={handleChange} className={inputClass} />
+                        <input name="passMarks" type="number" placeholder="Pass Marks" required value={formData.passMarks} onChange={handleChange} className={inputClass} />
                     </div>
 
-                    {/* Questions Section */}
-                    <div className="border-t pt-4">
-                        <h4 className="font-bold mb-4">Questions ({formData.questions?.length || 0})</h4>
+                    <div className="border-t border-gray-100 pt-6">
+                        <div className="flex justify-between items-center mb-4">
+                            <h4 className="font-extrabold text-lg text-gray-800">Questions ({formData.questions?.length || 0})</h4>
+                        </div>
                         
-                        <div className="bg-gray-50 p-4 rounded-lg mb-4">
+                        <div className="bg-amber-50/50 p-6 rounded-2xl border border-amber-100 mb-6">
                             <input 
                                 name="questionText" 
-                                placeholder="Question Text" 
+                                placeholder="Start typing your question..." 
                                 value={question.questionText} 
                                 onChange={handleQuestionChange} 
-                                className="w-full px-4 py-2 border rounded-lg mb-3" 
+                                className={`${inputClass} mb-4 bg-white`} 
                             />
-                            <div className="grid grid-cols-2 gap-3 mb-3">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-4">
                                 {question.options.map((opt, idx) => (
                                     <input 
                                         key={idx} 
                                         placeholder={`Option ${idx + 1}`} 
                                         value={opt} 
                                         onChange={(e) => handleOptionChange(idx, e.target.value)} 
-                                        className="w-full px-3 py-2 border rounded-lg text-sm" 
+                                        className={`${inputClass} text-sm py-2`} 
                                     />
                                 ))}
                             </div>
-                            <div className="mb-3">
-                                <label className="block text-sm font-medium text-gray-700 mb-1">Correct Answer</label>
+                            <div className="mb-4">
                                 <select 
                                     name="correctAnswer" 
                                     value={question.correctAnswer} 
                                     onChange={handleQuestionChange} 
-                                    className="w-full px-3 py-2 border rounded-lg"
+                                    className={`${inputClass} bg-white`}
                                 >
                                     <option value="">Select Correct Option</option>
                                     {question.options.map((opt, idx) => (
@@ -449,22 +505,27 @@ const CreateExamModal = ({ mode = 'add', initialData, onClose, onRefresh }) => {
                                     ))}
                                 </select>
                             </div>
-                            <button type="button" onClick={addQuestion} className="w-full py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 text-sm">Add Question</button>
+                            <button type="button" onClick={addQuestion} className="w-full py-3 bg-gray-900 text-white rounded-xl hover:bg-black font-bold shadow-lg transition-all">Add Question</button>
                         </div>
 
-                        <div className="space-y-2 max-h-40 overflow-y-auto">
+                        <div className="space-y-3 max-h-60 overflow-y-auto pr-2 custom-scrollbar">
                             {formData.questions?.map((q, idx) => (
-                                <div key={idx} className="flex justify-between items-center bg-gray-100 p-2 rounded text-sm">
-                                    <span className="truncate w-3/4">{idx + 1}. {q.questionText}</span>
-                                    <button type="button" onClick={() => removeQuestion(idx)} className="text-red-500 hover:text-red-700">Remove</button>
+                                <div key={idx} className="flex justify-between items-center bg-white p-4 rounded-xl border border-gray-100 shadow-sm">
+                                    <div className="flex-1 min-w-0 mr-4">
+                                        <p className="font-bold text-gray-800 truncate">{idx + 1}. {q.questionText}</p>
+                                        <p className="text-xs text-green-600 font-mono mt-1">Ans: {q.correctAnswer}</p>
+                                    </div>
+                                    <button type="button" onClick={() => removeQuestion(idx)} className="text-red-500 hover:text-red-700 bg-red-50 p-2 rounded-lg transition-colors">
+                                        <FaTrash size={14} />
+                                    </button>
                                 </div>
                             ))}
                         </div>
                     </div>
 
-                    <div className="flex space-x-3 pt-4 border-t">
-                        <button type="button" onClick={onClose} className="flex-1 py-2 bg-gray-100 rounded-lg hover:bg-gray-200">Cancel</button>
-                        <button type="submit" className="flex-1 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">Save Exam</button>
+                    <div className="flex space-x-3 pt-6 border-t border-gray-100">
+                        <button type="button" onClick={onClose} className="flex-1 py-3 bg-white border border-gray-200 text-gray-700 rounded-xl hover:bg-gray-50 font-bold transition-colors">Cancel</button>
+                        <button type="submit" className="flex-1 py-3 bg-gradient-to-r from-amber-500 to-orange-600 text-white rounded-xl hover:shadow-lg hover:scale-[1.02] font-bold transition-all shadow-md">Save Exam</button>
                     </div>
                 </form>
             </motion.div>
@@ -490,25 +551,33 @@ const AddStudentModal = ({ onClose, onRefresh }) => {
             toast.error(error.response?.data?.message || 'Failed to add student');
         }
     };
+    
+    const inputClass = "w-full px-5 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-green-500 outline-none transition-all font-medium";
 
     return (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
             <motion.div 
                 initial={{ scale: 0.9, opacity: 0 }}
                 animate={{ scale: 1, opacity: 1 }}
-                className="bg-white rounded-2xl p-8 w-full max-w-md shadow-2xl"
+                className="bg-white/95 backdrop-blur-2xl rounded-3xl p-8 w-full max-w-md shadow-2xl border border-white/50"
             >
-                <h3 className="text-2xl font-bold mb-6">Add New Student</h3>
+                <div className="mb-6">
+                    <h3 className="text-2xl font-black text-gray-900">Add New Student</h3>
+                    <p className="text-gray-500">Enter student details below.</p>
+                </div>
+                
                 <form onSubmit={handleSubmit} className="space-y-4">
-                    <input name="name" placeholder="Name" required onChange={handleChange} className="w-full px-4 py-2 border rounded-lg" />
-                    <input name="email" type="email" placeholder="Email" required onChange={handleChange} className="w-full px-4 py-2 border rounded-lg" />
-                    <input name="studentId" placeholder="Student ID" required onChange={handleChange} className="w-full px-4 py-2 border rounded-lg" />
-                    <input name="class" placeholder="Class" required onChange={handleChange} className="w-full px-4 py-2 border rounded-lg" />
-                    <input name="section" placeholder="Section" onChange={handleChange} className="w-full px-4 py-2 border rounded-lg" />
+                    <input name="name" placeholder="Full Name" required onChange={handleChange} className={inputClass} />
+                    <input name="email" type="email" placeholder="Email Address" required onChange={handleChange} className={inputClass} />
+                    <input name="studentId" placeholder="Student ID" required onChange={handleChange} className={inputClass} />
+                    <div className="grid grid-cols-2 gap-4">
+                        <input name="class" placeholder="Class" required onChange={handleChange} className={inputClass} />
+                        <input name="section" placeholder="Section" onChange={handleChange} className={inputClass} />
+                    </div>
 
-                    <div className="flex space-x-3 mt-6">
-                        <button type="button" onClick={onClose} className="flex-1 py-2 bg-gray-100 rounded-lg hover:bg-gray-200">Cancel</button>
-                        <button type="submit" className="flex-1 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">Add Student</button>
+                    <div className="flex space-x-3 mt-8">
+                        <button type="button" onClick={onClose} className="flex-1 py-3 bg-white border border-gray-200 text-gray-700 rounded-xl hover:bg-gray-50 font-bold">Cancel</button>
+                        <button type="submit" className="flex-1 py-3 bg-gradient-to-r from-green-500 to-emerald-600 text-white rounded-xl hover:shadow-lg font-bold">Add Student</button>
                     </div>
                 </form>
             </motion.div>
@@ -516,55 +585,68 @@ const AddStudentModal = ({ onClose, onRefresh }) => {
     );
 };
 
-const PublishResultModal = ({ exam, students, onClose }) => {
-    const [formData, setFormData] = useState({ examId: exam._id });
-
-    const handleChange = (e) => {
-        setFormData({ ...formData, [e.target.name]: e.target.value });
-    };
-
-    const handleSubmit = async (e) => {
-        e.preventDefault();
-        try {
-            await axios.post('/teacher/results', formData);
-            toast.success('Result published successfully');
-            onClose();
-        } catch (error) {
-            toast.error(error.response?.data?.message || 'Failed to publish result');
-        }
-    };
-
+const ViewResultsModal = ({ results, loading, onClose }) => {
     return (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={onClose}>
             <motion.div 
                 initial={{ scale: 0.9, opacity: 0 }}
                 animate={{ scale: 1, opacity: 1 }}
-                className="bg-white rounded-2xl p-8 w-full max-w-md shadow-2xl"
+                onClick={e => e.stopPropagation()}
+                className="bg-white/95 backdrop-blur-2xl rounded-3xl w-full max-w-4xl shadow-2xl border border-white/50 max-h-[85vh] flex flex-col overflow-hidden"
             >
-                <h3 className="text-2xl font-bold mb-2">Publish Results</h3>
-                <p className="text-gray-500 mb-6">Exam: {exam.name} ({exam.subject})</p>
-                
-                <form onSubmit={handleSubmit} className="space-y-4">
+                <div className="p-6 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
                     <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Select Student</label>
-                        <select name="studentId" required onChange={handleChange} className="w-full px-4 py-2 border rounded-lg bg-white">
-                            <option value="">-- Select Student --</option>
-                            {students.map(s => (
-                                <option key={s._id} value={s._id}>{s.name} ({s.studentId})</option>
-                            ))}
-                        </select>
+                        <h3 className="text-2xl font-black text-gray-900">Exam Results</h3>
+                        <p className="text-blue-600 font-bold">{results?.name}</p>
                     </div>
+                    <button onClick={onClose} className="p-2 hover:bg-gray-200 rounded-full text-gray-500 transition-colors">✕</button>
+                </div>
 
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Marks Obtained (Max: {exam.fullMarks})</label>
-                        <input name="marks" type="number" max={exam.fullMarks} required onChange={handleChange} className="w-full px-4 py-2 border rounded-lg" />
-                    </div>
-
-                    <div className="flex space-x-3 mt-6">
-                        <button type="button" onClick={onClose} className="flex-1 py-2 bg-gray-100 rounded-lg hover:bg-gray-200">Cancel</button>
-                        <button type="submit" className="flex-1 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700">Publish</button>
-                    </div>
-                </form>
+                <div className="p-0 overflow-y-auto flex-1 bg-white">
+                    {loading ? (
+                         <div className="flex justify-center items-center h-64">
+                            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-amber-500"></div>
+                        </div>
+                    ) : results?.data?.length === 0 ? (
+                        <div className="text-center py-20">
+                            <div className="inline-block p-4 bg-gray-100 rounded-full mb-4">
+                                <FaClipboardList className="text-gray-300 text-4xl" />
+                            </div>
+                            <p className="text-gray-500 font-bold">No submissions yet.</p>
+                        </div>
+                    ) : (
+                        <table className="w-full text-left">
+                            <thead className="bg-gray-50 text-gray-500 text-xs uppercase tracking-wider font-bold">
+                                <tr>
+                                    <th className="px-8 py-4">Student</th>
+                                    <th className="px-8 py-4">ID</th>
+                                    <th className="px-8 py-4">Score</th>
+                                    <th className="px-8 py-4">Status</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-gray-100">
+                                {results?.data.map((res) => {
+                                    const passed = res.marksObtained >= (res.exam?.passMarks || 0);
+                                    return (
+                                        <tr key={res._id} className="hover:bg-gray-50/80 transition-colors">
+                                            <td className="px-8 py-4 font-bold text-gray-900">{res.student?.name}</td>
+                                            <td className="px-8 py-4 font-mono text-gray-500 text-sm">{res.student?.studentId}</td>
+                                            <td className="px-8 py-4">
+                                                <span className="text-2xl font-black text-gray-800">{res.marksObtained}</span>
+                                                <span className="text-xs text-gray-400 ml-1">/ {res.exam?.fullMarks}</span>
+                                            </td>
+                                            <td className="px-8 py-4">
+                                                <span className={`px-3 py-1 rounded-lg text-xs font-extrabold uppercase tracking-wide ${passed ? 'bg-green-100 text-green-600' : 'bg-red-100 text-red-600'}`}>
+                                                    {passed ? 'Passed' : 'Failed'}
+                                                </span>
+                                            </td>
+                                        </tr>
+                                    );
+                                })}
+                            </tbody>
+                        </table>
+                    )}
+                </div>
             </motion.div>
         </div>
     );

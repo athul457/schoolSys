@@ -1,6 +1,111 @@
 const Student = require('../models/Student');
 const Exam = require('../models/Exam');
 const Result = require('../models/Result');
+const Note = require('../models/Note');
+const { GoogleGenerativeAI } = require("@google/generative-ai");
+
+// @desc    Generate Study Notes
+// @route   POST /api/student/generate-notes
+// @access  Private/Student
+const generateNotes = async (req, res) => {
+    try {
+        const { topic, subject } = req.body;
+
+        if (!process.env.GEMINI_API_KEY) {
+            return res.status(500).json({ message: "Gemini API Key is not configured" });
+        }
+
+        const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+        const model = genAI.getGenerativeModel({ model: "gemini-flash-latest" });
+
+        const prompt = `Generate detailed, easy-to-understand study notes for a school student on the topic "${topic}" for the subject "${subject}". 
+        Include:
+        1. Key Concepts (Bullet points)
+        2. Important Definitions
+        3. Real-world Examples
+        4. Summary
+        
+        Format the output in clear Markdown.`;
+
+        const result = await model.generateContent(prompt);
+        const response = await result.response;
+        const text = response.text();
+
+        res.json({ notes: text });
+
+    } catch (error) {
+        console.error("Gemini API Error:", error);
+        res.status(500).json({ message: "AI Error: " + (error.message || "Failed to generate notes") });
+    }
+};
+
+// @desc    Ask a Question about the Topic
+// @route   POST /api/student/ask-question
+// @access  Private/Student
+const askQuestion = async (req, res) => {
+    try {
+        const { topic, subject, question } = req.body;
+
+        if (!process.env.GEMINI_API_KEY) {
+            return res.status(500).json({ message: "Gemini API Key is not configured" });
+        }
+
+        const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+        const model = genAI.getGenerativeModel({ model: "gemini-flash-latest" });
+
+        const prompt = `
+        Context: The student is studying "${topic}" in the subject "${subject}".
+        Question: ${question}
+        
+        Provide a clear, concise, and helpful answer suitable for a school student.
+        Format the answer in Markdown.
+        `;
+
+        const result = await model.generateContent(prompt);
+        const response = await result.response;
+        const text = response.text();
+
+        res.json({ answer: text });
+
+    } catch (error) {
+        console.error("Gemini API Error:", error);
+        res.status(500).json({ message: "AI Error: " + (error.message || "Failed to get answer") });
+    }
+};
+
+// @desc    Save Study Note
+// @route   POST /api/student/save-note
+// @access  Private/Student
+const saveNote = async (req, res) => {
+    try {
+        const { topic, subject, content } = req.body;
+        
+        const note = await Note.create({
+            studentId: req.user._id,
+            topic,
+            subject,
+            content
+        });
+
+        res.status(201).json(note);
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: "Failed to save note" });
+    }
+};
+
+// @desc    Get Saved Notes
+// @route   GET /api/student/saved-notes
+// @access  Private/Student
+const getSavedNotes = async (req, res) => {
+    try {
+        const notes = await Note.find({ studentId: req.user._id }).sort({ createdAt: -1 });
+        res.json(notes);
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: "Failed to load notes" });
+    }
+};
 
 // @desc    Update Student Profile
 // @route   PUT /api/student/profile
@@ -13,13 +118,19 @@ const getAvailableExams = async (req, res) => {
         const student = await Student.findById(req.user._id);
         if (!student) return res.status(404).json({ message: 'Student not found' });
 
+        // Fetch all results for this student to know which exams are attempted
+        const attemptedExams = await Result.find({ student: req.user._id }).select('exam');
+        const attemptedExamIds = attemptedExams.map(result => result.exam.toString());
+
         // Fetch exams for the student's class
-        // Optional: Filter by date (e.g., date >= today)
         const exams = await Exam.find({ class: student.class })
-            .select('-questions.correctAnswer') // Don't send correct answers to frontend!
+            .select('-questions.correctAnswer')
             .populate('createdBy', 'name');
 
-        res.json(exams);
+        // Filter out exams that are already attempted
+        const availableExams = exams.filter(exam => !attemptedExamIds.includes(exam._id.toString()));
+
+        res.json(availableExams);
     } catch (error) {
         res.status(500).json({ message: error.message });
     }
@@ -127,4 +238,4 @@ const updateProfile = async (req, res) => {
     }
 };
 
-module.exports = { updateProfile, getAvailableExams, submitExam, getMyResults };
+module.exports = { updateProfile, getAvailableExams, submitExam, getMyResults, generateNotes, askQuestion, saveNote, getSavedNotes };

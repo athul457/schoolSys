@@ -20,38 +20,65 @@ const Navbar = () => {
   }
 
   return (
-    <nav className="bg-white/80 backdrop-blur-md shadow-md fixed w-full z-50 top-0 left-0 border-b border-gray-200">
+    <nav className="bg-white/70 backdrop-blur-lg fixed w-full z-50 top-0 left-0 border-b border-white/50 shadow-sm transition-all duration-300">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex justify-between items-center h-16">
-          <Link to="/" className="flex items-center">
+        <div className="flex justify-between items-center h-20">
+          {/* Logo */}
+          <Link to="/" className="flex items-center gap-2 group">
              <motion.div 
-               whileHover={{ scale: 1.1 }}
-               className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent"
+               whileHover={{ rotate: 360 }}
+               transition={{ duration: 0.6 }}
+               className="text-2xl"
+             >
+               🏫
+             </motion.div>
+             <motion.div 
+               className="text-2xl font-black bg-gradient-to-r from-amber-500 via-orange-500 to-red-500 bg-clip-text text-transparent tracking-tight group-hover:opacity-80 transition-opacity"
              >
                SchoolSys
              </motion.div>
           </Link>
           
-          <div className="flex items-center space-x-4">
-            <Link to="/" className="text-gray-600 hover:text-blue-600 font-medium transition-colors">Home</Link>
-            
+          {/* Nav Links */}
+          <div className="flex items-center space-x-1 sm:space-x-4">
+             {!user && (
+                <button 
+                  onClick={() => document.getElementById('features')?.scrollIntoView({ behavior: 'smooth' })}
+                  className="hidden md:block px-4 py-2 text-gray-600 font-medium hover:text-amber-600 hover:bg-amber-50 rounded-full transition-all"
+                >
+                  Features
+                </button>
+             )}
+
             {user ? (
-              <>
-                <Link to={dashboardRoute()} className="text-gray-600 hover:text-blue-600 font-medium transition-colors">
-                  Go to Dashboard
+              <div className="flex items-center gap-4">
+                <Link to={dashboardRoute()}>
+                   <motion.button
+                      whileHover={{ scale: 1.05 }}
+                      whileTap={{ scale: 0.95 }}
+                      className="px-5 py-2 rounded-full bg-gradient-to-r from-amber-500 to-orange-600 text-white font-semibold shadow-md hover:shadow-lg transition-all flex items-center gap-2"
+                   >
+                     <span>Dashboard</span>
+                     {/* <span className="text-white/80">→</span> */}
+                   </motion.button>
                 </Link>
-                <div className="flex items-center gap-2">
-                    <span className="text-sm font-semibold text-gray-500 bg-gray-100 px-3 py-1 rounded-full">{user.role}</span>
+                <div className="hidden sm:flex items-center gap-2">
+                    <span className="px-3 py-1 bg-amber-100 text-amber-700 text-xs font-bold uppercase tracking-wider rounded-full border border-amber-200">
+                      {user.role}
+                    </span>
                 </div>
-              </>
+              </div>
             ) : (
               <Link to="/login">
                 <motion.button 
                   whileHover={{ scale: 1.05 }}
                   whileTap={{ scale: 0.95 }}
-                  className="bg-gradient-to-r from-blue-600 to-purple-600 text-white px-6 py-2 rounded-full font-medium shadow-lg hover:shadow-xl transition-all"
+                  className="relative px-6 py-2.5 rounded-full font-bold text-white shadow-lg group overflow-hidden"
                 >
-                  Login
+                  <span className="absolute inset-0 bg-gradient-to-r from-amber-500 to-orange-600 group-hover:from-amber-600 group-hover:to-orange-700 transition-colors"></span>
+                  <span className="relative flex items-center gap-2">
+                    Login <span className="text-lg">✨</span>
+                  </span>
                 </motion.button>
               </Link>
             )}
