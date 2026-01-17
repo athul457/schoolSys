@@ -12,7 +12,8 @@ export const AuthProvider = ({ children }) => {
 
   // Set base URL for axios
   // Set base URL for axios
-  axios.defaults.baseURL = `${import.meta.env.VITE_API_URL}/api`;
+  // Hardcoded for production stability
+  axios.defaults.baseURL = 'https://schoolsys-yr1l.onrender.com/api';
 
   useEffect(() => {
     const userInfo = localStorage.getItem('userInfo');
