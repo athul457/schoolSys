@@ -15,13 +15,7 @@ const teacherRoutes = require('./routes/teacherRoutes');
 const app = express();
 const PORT = process.env.PORT || 5000;
 
-app.use(
-  cors({
-    origin: ["https://schoolsys-app.netlify.app", "http://localhost:5173", "http://localhost:3000"],
-    methods: ["GET", "POST", "PUT", "DELETE", "PATCH"],
-    allowedHeaders: ["Content-Type", "Authorization"],
-  })
-);
+app.use(cors());
 app.use(express.json());
 
 app.use('/api/auth', authRoutes);
