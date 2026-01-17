@@ -41,7 +41,7 @@ export const AuthProvider = ({ children }) => {
       
       const errorMessage = error.response?.data?.message || error.message || 'Login failed';
       const status = error.response?.status ? ` (${error.response.status})` : '';
-      toast.error(`${errorMessage}${status} - See Console for URL`);
+      toast.error(`${errorMessage}${status} -> Trying: ${axios.defaults.baseURL}/auth/login`);
       return false;
     }
   };
