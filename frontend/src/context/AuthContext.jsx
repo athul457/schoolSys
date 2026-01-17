@@ -11,7 +11,7 @@ export const AuthProvider = ({ children }) => {
   const [loading, setLoading] = useState(true);
 
   // Set base URL for axios
-  axios.defaults.baseURL = 'http://localhost:3030/api';
+  axios.defaults.baseURL = 'https://schoolsys-yr1l.onrender.com/api';
 
   useEffect(() => {
     const userInfo = localStorage.getItem('userInfo');
