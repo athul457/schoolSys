@@ -36,9 +36,12 @@ export const AuthProvider = ({ children }) => {
       return true;
     } catch (error) {
       console.error("Login Error Details:", error);
+      console.error("Attempted URL:", error.config?.url);
+      console.error("Base URL:", axios.defaults.baseURL);
+      
       const errorMessage = error.response?.data?.message || error.message || 'Login failed';
       const status = error.response?.status ? ` (${error.response.status})` : '';
-      toast.error(errorMessage + status);
+      toast.error(`${errorMessage}${status} - See Console for URL`);
       return false;
     }
   };
