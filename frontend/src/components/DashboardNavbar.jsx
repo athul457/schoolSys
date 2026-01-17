@@ -34,7 +34,7 @@ const DashboardNavbar = () => {
 
     const enableEditMode = () => {
         setEditForm({ name: user.name, email: user.email });
-        setImagePreview(user.profileImage ? `https://schoolsys-yr1l.onrender.com${user.profileImage}` : null);
+        setImagePreview(user.profileImage ? `${import.meta.env.VITE_API_URL}${user.profileImage}` : null);
         setIsEditing(true);
     };
 
@@ -92,7 +92,7 @@ const DashboardNavbar = () => {
                 >
                      <span className="font-bold text-gray-700 hidden md:block">{user?.name}</span>
                     {user?.profileImage ? (
-                        <img src={`https://schoolsys-yr1l.onrender.com${user.profileImage}`} alt="Profile" className="w-9 h-9 rounded-full object-cover border-2 border-amber-100 shadow-sm" />
+                        <img src={`${import.meta.env.VITE_API_URL}${user.profileImage}`} alt="Profile" className="w-9 h-9 rounded-full object-cover border-2 border-amber-100 shadow-sm" />
                     ) : (
                         <FaUserCircle size={24} className="text-amber-300"/>
                     )}
@@ -139,7 +139,7 @@ const DashboardNavbar = () => {
                                             {isEditing && imagePreview ? (
                                                 <img src={imagePreview} alt="Preview" className="w-full h-full object-cover" />
                                             ) : user?.profileImage ? (
-                                                <img src={`https://schoolsys-yr1l.onrender.com${user.profileImage}`} alt="Profile" className="w-full h-full object-cover" />
+                                                <img src={`${import.meta.env.VITE_API_URL}${user.profileImage}`} alt="Profile" className="w-full h-full object-cover" />
                                             ) : (
                                                 <span className="text-3xl font-bold text-amber-400">{user?.name?.charAt(0).toUpperCase()}</span>
                                             )}
