@@ -25,6 +25,11 @@ const protect = async (req, res, next) => {
 
       req.user = user;
       
+      // Check for suspension
+      if (user.isSuspended) {
+          return res.status(403).json({ message: 'Account suspended' });
+      }
+
       // Attach role for easier access control
       if (user instanceof Admin) req.user.role = 'Admin';
       // Teacher/Student models already have role field, but fallback if not

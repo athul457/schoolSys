@@ -4,8 +4,10 @@ import { toast } from 'react-hot-toast';
 import { motion, AnimatePresence } from 'framer-motion';
 import { FaChalkboardTeacher, FaUserGraduate, FaClipboardList, FaUserPlus, FaBan, FaTrash, FaCheck } from 'react-icons/fa';
 import DashboardNavbar from '../components/DashboardNavbar';
+import { useAuth } from '../context/AuthContext';
 
 const AdminDashboard = () => {
+    const { user } = useAuth();
     const [activeTab, setActiveTab] = useState('teachers'); // teachers, students, exams
     const [teachers, setTeachers] = useState([]);
     const [students, setStudents] = useState([]);
@@ -21,13 +23,13 @@ const AdminDashboard = () => {
         try {
             if (activeTab === 'teachers') {
                 const { data } = await axios.get('/admin/teachers');
-                setTeachers(data);
+                setTeachers(Array.isArray(data) ? data : []);
             } else if (activeTab === 'students') {
                 const { data } = await axios.get('/admin/students');
-                setStudents(data);
+                setStudents(Array.isArray(data) ? data : []);
             } else if (activeTab === 'exams') {
                 const { data } = await axios.get('/admin/exams');
-                setExams(data);
+                setExams(Array.isArray(data) ? data : []);
             }
         } catch (error) {
             toast.error('Failed to fetch data');
@@ -39,24 +41,28 @@ const AdminDashboard = () => {
         fetchData();
     }, [activeTab]);
 
-    const handleSuspend = async (type, id, currentStatus) => {
+    const handleSuspend = async (type, id) => {
         try {
-            await axios.put(`/admin/suspend/${type}/${id}`, { isSuspended: !currentStatus });
-            toast.success(`User ${!currentStatus ? 'suspended' : 'unsuspended'}`);
+            const { data } = await axios.put(`/admin/suspend/${type}/${id}`);
+            toast.success(data.message);
             fetchData();
         } catch (error) {
-            toast.error('Action failed');
+            console.error('Suspend Error:', error);
+            const msg = error.response?.data?.message || error.message || 'Action failed';
+            toast.error(msg);
         }
     };
 
     const handleTerminate = async (type, id) => {
-        if (!window.confirm('Are you sure you want to terminate this user? This action can be undone.')) return;
+        if (!window.confirm('Are you sure you want to PERMANENTLY terminate this user? This action CANNOT be undone.')) return;
         try {
             await axios.put(`/admin/terminate/${type}/${id}`);
-            toast.success('User terminated');
+            toast.success('User terminated globally');
             fetchData();
         } catch (error) {
-            toast.error('Termination failed');
+            console.error('Terminate Error:', error);
+            const msg = error.response?.data?.message || error.message || 'Termination failed';
+            toast.error(msg);
         }
     };
 
@@ -65,6 +71,7 @@ const AdminDashboard = () => {
             <DashboardNavbar />
             <div className="max-w-7xl mx-auto pt-6">
                 <h1 className="text-3xl font-bold text-gray-900 mb-8">Admin Dashboard</h1>
+                
 
                 {/* Tabs */}
                 <div className="flex space-x-4 mb-8 bg-white p-2 rounded-xl shadow-sm w-fit">
@@ -129,6 +136,7 @@ const AdminDashboard = () => {
 
 const TeachersSection = ({ teachers, loading, onRefresh, onSuspend, onTerminate }) => {
     const [modalConfig, setModalConfig] = useState({ show: false, mode: 'add', data: null });
+    const [viewMode, setViewMode] = useState('active'); // 'active' or 'suspended'
 
     const handleEdit = (teacher) => {
         setModalConfig({ show: true, mode: 'edit', data: teacher });
@@ -138,10 +146,32 @@ const TeachersSection = ({ teachers, loading, onRefresh, onSuspend, onTerminate 
         setModalConfig({ show: true, mode: 'add', data: null });
     };
 
+    // Filter teachers based on view mode
+    const teacherList = Array.isArray(teachers) ? teachers : [];
+    const filteredTeachers = teacherList.filter(t => 
+        viewMode === 'active' ? !t.isSuspended : t.isSuspended
+    );
+
     return (
         <div>
-            <div className="flex justify-between items-center mb-6">
-                <h2 className="text-xl font-bold text-gray-800">Manage Teachers</h2>
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
+                <div className="flex items-center space-x-4">
+                    <h2 className="text-xl font-bold text-gray-800">Manage Teachers</h2>
+                    <div className="flex bg-gray-200 p-1 rounded-lg">
+                        <button 
+                            onClick={() => setViewMode('active')}
+                            className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all ${viewMode === 'active' ? 'bg-white shadow text-blue-700' : 'text-gray-600 hover:text-gray-900'}`}
+                        >
+                            Active
+                        </button>
+                        <button 
+                            onClick={() => setViewMode('suspended')}
+                            className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all ${viewMode === 'suspended' ? 'bg-white shadow text-red-700' : 'text-gray-600 hover:text-gray-900'}`}
+                        >
+                            Suspended
+                        </button>
+                    </div>
+                </div>
                 <button 
                     onClick={handleAdd}
                     className="flex items-center space-x-2 bg-green-600 text-white px-4 py-2 rounded-lg shadow hover:bg-green-700 transition"
@@ -152,7 +182,7 @@ const TeachersSection = ({ teachers, loading, onRefresh, onSuspend, onTerminate 
 
             {loading ? <p>Loading...</p> : (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {teachers.map(teacher => (
+                    {filteredTeachers.map(teacher => (
                         <UserCard 
                             key={teacher._id} 
                             user={teacher} 
@@ -162,7 +192,9 @@ const TeachersSection = ({ teachers, loading, onRefresh, onSuspend, onTerminate 
                             onEdit={() => handleEdit(teacher)}
                         />
                     ))}
-                    {teachers.length === 0 && <p className="text-gray-500">No teachers found.</p>}
+                    {filteredTeachers.length === 0 && (
+                        <p className="text-gray-500 italic">No {viewMode} teachers found.</p>
+                    )}
                 </div>
             )}
             
@@ -181,11 +213,34 @@ const TeachersSection = ({ teachers, loading, onRefresh, onSuspend, onTerminate 
 
 const StudentsSection = ({ students, loading, onRefresh, onSuspend, onTerminate }) => {
     const [showModal, setShowModal] = useState(false);
+    const [viewMode, setViewMode] = useState('active'); // 'active' or 'suspended'
+
+    // Filter students based on view mode
+    const studentList = Array.isArray(students) ? students : [];
+    const filteredStudents = studentList.filter(s => 
+        viewMode === 'active' ? !s.isSuspended : s.isSuspended
+    );
 
     return (
         <div>
-            <div className="flex justify-between items-center mb-6">
-                <h2 className="text-xl font-bold text-gray-800">Manage Students</h2>
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
+                 <div className="flex items-center space-x-4">
+                    <h2 className="text-xl font-bold text-gray-800">Manage Students</h2>
+                    <div className="flex bg-gray-200 p-1 rounded-lg">
+                        <button 
+                            onClick={() => setViewMode('active')}
+                            className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all ${viewMode === 'active' ? 'bg-white shadow text-blue-700' : 'text-gray-600 hover:text-gray-900'}`}
+                        >
+                            Active
+                        </button>
+                        <button 
+                            onClick={() => setViewMode('suspended')}
+                            className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all ${viewMode === 'suspended' ? 'bg-white shadow text-red-700' : 'text-gray-600 hover:text-gray-900'}`}
+                        >
+                            Suspended
+                        </button>
+                    </div>
+                </div>
                 <button 
                     onClick={() => setShowModal(true)}
                     className="flex items-center space-x-2 bg-green-600 text-white px-4 py-2 rounded-lg shadow hover:bg-green-700 transition"
@@ -196,7 +251,7 @@ const StudentsSection = ({ students, loading, onRefresh, onSuspend, onTerminate 
 
             {loading ? <p>Loading...</p> : (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {students.map(student => (
+                    {filteredStudents.map(student => (
                         <UserCard 
                             key={student._id} 
                             user={student} 
@@ -205,7 +260,7 @@ const StudentsSection = ({ students, loading, onRefresh, onSuspend, onTerminate 
                             onTerminate={onTerminate} 
                         />
                     ))}
-                    {students.length === 0 && <p className="text-gray-500">No students found.</p>}
+                    {filteredStudents.length === 0 && <p className="text-gray-500 italic">No {viewMode} students found.</p>}
                 </div>
             )}
 
@@ -250,19 +305,17 @@ const ExamsSection = ({ exams, loading }) => {
 };
 
 const UserCard = ({ user, type, onSuspend, onTerminate, onEdit }) => {
-    const isTerminated = user.isTerminated;
     const isSuspended = user.isSuspended;
 
     return (
-        <div className={`bg-white rounded-xl shadow-sm p-6 border ${isTerminated ? 'border-red-200 bg-red-50' : 'border-gray-100'}`}>
+        <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
             <div className="flex justify-between items-start mb-4">
                 <div>
                     <h3 className="font-bold text-lg text-gray-900">{user.name}</h3>
                     <p className="text-sm text-gray-500">{user.email}</p>
                     <p className="text-xs text-gray-400 mt-1">ID: {type === 'teacher' ? user.teacherId : user.studentId}</p>
                 </div>
-                {isTerminated && <span className="text-xs font-bold text-red-600 bg-red-100 px-2 py-1 rounded">Terminated</span>}
-                {!isTerminated && isSuspended && <span className="text-xs font-bold text-yellow-600 bg-yellow-100 px-2 py-1 rounded">Suspended</span>}
+                {isSuspended && <span className="text-xs font-bold text-yellow-600 bg-yellow-100 px-2 py-1 rounded">Suspended</span>}
             </div>
             
             <div className="flex items-center justify-between text-sm text-gray-600 mb-4">
@@ -271,33 +324,33 @@ const UserCard = ({ user, type, onSuspend, onTerminate, onEdit }) => {
                 {type === 'student' && <span>Class: {user.class} {user.section}</span>}
             </div>
 
-            {!isTerminated && (
-                <div className="space-y-2">
-                     <div className="flex space-x-2">
-                        <button 
-                            onClick={() => onSuspend(type, user._id, isSuspended)}
-                            className={`flex-1 py-1.5 rounded text-sm font-medium transition-colors ${isSuspended ? 'bg-yellow-100 text-yellow-700 hover:bg-yellow-200' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}
-                        >
-                            {isSuspended ? 'Unsuspend' : 'Suspend'}
-                        </button>
-                        <button 
-                            onClick={() => onTerminate(type, user._id)}
-                            className="flex-1 py-1.5 rounded text-sm font-medium bg-red-50 text-red-600 hover:bg-red-100 transition-colors"
-                        >
-                            Terminate
-                        </button>
-                    </div>
-                    {onEdit && (
-                         <button 
-                            onClick={onEdit}
-                            className="w-full py-1.5 rounded text-sm font-medium bg-blue-50 text-blue-600 hover:bg-blue-100 transition-colors"
-                         >
-                            Edit Details
-                         </button>
-                    )}
+            <div className="space-y-2">
+                    <div className="flex space-x-2">
+                    <button 
+                        onClick={(e) => {
+                            e.preventDefault();
+                            onSuspend(type, user._id);
+                        }}
+                        className={`flex-1 py-1.5 rounded text-sm font-medium transition-colors ${isSuspended ? 'bg-yellow-100 text-yellow-700 hover:bg-yellow-200' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}
+                    >
+                        {isSuspended ? 'Unsuspend' : 'Suspend'}
+                    </button>
+                    <button 
+                        onClick={() => onTerminate(type, user._id)}
+                        className="flex-1 py-1.5 rounded text-sm font-medium bg-red-50 text-red-600 hover:bg-red-100 transition-colors"
+                    >
+                        Terminate
+                    </button>
                 </div>
-            )}
-            {isTerminated && <p className="text-sm text-red-500 italic">Access Revoked</p>}
+                {onEdit && (
+                        <button 
+                        onClick={onEdit}
+                        className="w-full py-1.5 rounded text-sm font-medium bg-blue-50 text-blue-600 hover:bg-blue-100 transition-colors"
+                        >
+                        Edit Details
+                        </button>
+                )}
+            </div>
         </div>
     );
 };

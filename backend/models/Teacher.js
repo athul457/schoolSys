@@ -37,7 +37,6 @@ const teacherSchema = new mongoose.Schema({
     type: String,
   },
   isSuspended: { type: Boolean, default: false },
-  isTerminated: { type: Boolean, default: false },
   role: { type: String, default: 'Teacher' }
 });
 
@@ -45,9 +44,9 @@ teacherSchema.methods.matchPassword = async function (enteredPassword) {
   return await bcrypt.compare(enteredPassword, this.password);
 };
 
-teacherSchema.pre('save', async function (next) {
+teacherSchema.pre('save', async function () {
   if (!this.isModified('password')) {
-    next();
+    return;
   }
   const salt = await bcrypt.genSalt(10);
   this.password = await bcrypt.hash(this.password, salt);

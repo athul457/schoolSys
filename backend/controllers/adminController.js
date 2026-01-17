@@ -113,7 +113,6 @@ const getStudents = async (req, res) => {
 // @access  Private/Admin
 const toggleSuspend = async (req, res) => {
     const { type, id } = req.params; // type: 'teacher' or 'student'
-    const { isSuspended } = req.body;
 
     try {
         let user;
@@ -122,9 +121,14 @@ const toggleSuspend = async (req, res) => {
 
         if (!user) return res.status(404).json({ message: 'User not found' });
 
-        user.isSuspended = isSuspended;
+        // Toggle the status
+        user.isSuspended = !user.isSuspended;
         await user.save();
-        res.json({ message: `User ${isSuspended ? 'suspended' : 'unsuspended'} successfully` });
+        
+        res.json({ 
+            message: `User ${user.isSuspended ? 'suspended' : 'unsuspended'} successfully`,
+            isSuspended: user.isSuspended 
+        });
     } catch (error) {
         res.status(500).json({ message: error.message });
     }
@@ -142,7 +146,7 @@ const getAllExams = async (req, res) => {
     }
 };
 
-// @desc    Terminate (Soft Delete) Teacher/Student
+// @desc    Terminate (Hard Delete) Teacher/Student
 // @route   PUT /api/admin/terminate/:type/:id
 // @access  Private/Admin
 const terminateUser = async (req, res) => {
@@ -150,15 +154,12 @@ const terminateUser = async (req, res) => {
 
     try {
         let user;
-        if (type === 'teacher') user = await Teacher.findById(id);
-        if (type === 'student') user = await Student.findById(id);
+        if (type === 'teacher') user = await Teacher.findByIdAndDelete(id);
+        if (type === 'student') user = await Student.findByIdAndDelete(id);
 
         if (!user) return res.status(404).json({ message: 'User not found' });
 
-        user.isTerminated = true; // Soft delete
-        await user.save();
-
-        res.json({ message: 'User terminated successfully' });
+        res.json({ message: 'User terminated permanently' });
     } catch (error) {
         res.status(500).json({ message: error.message });
     }
