@@ -34,7 +34,10 @@ export const AuthProvider = ({ children }) => {
       toast.success(`Logged in as ${role}`);
       return true;
     } catch (error) {
-      toast.error(error.response?.data?.message || 'Login failed');
+      console.error("Login Error Details:", error);
+      const errorMessage = error.response?.data?.message || error.message || 'Login failed';
+      const status = error.response?.status ? ` (${error.response.status})` : '';
+      toast.error(errorMessage + status);
       return false;
     }
   };
