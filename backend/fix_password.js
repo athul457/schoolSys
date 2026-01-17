@@ -1,23 +1,18 @@
 const mongoose = require('mongoose');
-const Teacher = require('./models/Teacher');
-const connectDB = require('./config/db');
 const dotenv = require('dotenv');
 
 dotenv.config();
 
 const fixTeacherParams = async () => {
-    await connectDB();
-    
-    // allow time for connection
-    await new Promise(r => setTimeout(r, 1000));
-
-    const email = 'alka123@gmail.com'; // The one that failed
-    const teacher = await Teacher.findOne({ email });
-
-    if (teacher) {
-        console.log(`Found teacher: ${teacher.name} (${teacher.teacherId})`);
-    
     try {
+        const connectDB = require('./config/db');
+        await connectDB();
+        
+        // allow time for connection
+        await new Promise(r => setTimeout(r, 1000));
+
+        const email = 'alka123@gmail.com'; 
+        const Teacher = require('./models/Teacher');
         const teacher = await Teacher.findOne({ email });
 
         if (teacher) {
